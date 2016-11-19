@@ -9,6 +9,4 @@
 #ifndef DeferredRenderer_hpp
 #define DeferredRenderer_hpp
 
-#include <stdio.h>
-
 #endif /* DeferredRenderer_hpp */
