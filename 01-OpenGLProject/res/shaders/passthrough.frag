@@ -1,14 +1,19 @@
 #version 330 core
+
 in vec3 ourColor;
 in vec2 TexCoord;
 
 out vec4 color;
 
+
+
 // Texture samplers
-uniform sampler2D checktexture;
+uniform sampler2D gPosition;
+uniform sampler2D gNormal;
+uniform sampler2D gAlbedo;
 
 void main()
 {
     // Linearly interpolate between both textures (second texture is only slightly combined)
-    color = texture(checktexture, TexCoord);
+    color = texture(gPosition, TexCoord);
 }

@@ -21,7 +21,9 @@ uniform Material material;
 void main()
 {
     // Ambient
+    
     vec3 gAlbedoSpec = vec3(texture(material.diffuse, TexCoords));
+    vec3
     gPosition = Position;
 }
 

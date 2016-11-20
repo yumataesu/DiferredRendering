@@ -94,43 +94,53 @@ int main()
     // Build and compile our shader program
     Shader lightingShader( "res/shaders/lighting.vs", "res/shaders/lighting.frag" );
     Shader geometryPass( "res/shaders/deferred_shading.vs", "res/shaders/deferred_shading.frag" );
+    Shader quad_program( "res/shaders/passthrough.vs", "res/shaders/passthrough.frag" );
     
     //================================
     //texture
     
+    //フレームバッファオブジェクトを用意
+    GLuint fbo;
+    glGenFramebuffers(1, &fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     //color textureを用意
-    GLuint colorTex;
-    glGenTextures(1, &colorTex);
-    glBindTexture(GL_TEXTURE_2D, colorTex);
+    GLuint gAlbedo;
+    glGenTextures(1, &gAlbedo);
+    glBindTexture(GL_TEXTURE_2D, gAlbedo);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-    glBindTexture(GL_TEXTURE_2D, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gAlbedo, 0); //フレームバッファにカラーテクスチャをアタッチ
+
     
     
     //position textureを用意
-    GLuint positionTex;
-    glGenTextures(1, &positionTex);
+    GLuint gNormal;
+    glGenTextures(1, &gNormal);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-    glBindTexture(GL_TEXTURE_2D, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gNormal, 1); //フレームバッファにカラーテクスチャをアタッチ
     
     
     //normal textureを用意
-    GLuint normalTex;
-    glGenTextures(1, &normalTex);
+    GLuint gPosition;
+    glGenTextures(1, &gPosition);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
     glBindTexture(GL_TEXTURE_2D, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gPosition, 2); //フレームバッファにカラーテクスチャをアタッチ
     
+    
+    GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+    glDrawBuffers(3, attachments);
     
     //depth render textureを用意
     GLuint renderb;
@@ -138,20 +148,7 @@ int main()
     glBindRenderbuffer(GL_RENDERBUFFER, renderb);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, SCREEN_WIDTH, SCREEN_HEIGHT);
     glBindRenderbuffer(GL_RENDERBUFFER, 0);
-    
-    
-    //フレームバッファオブジェクトを用意
-    GLuint fbo;
-    glGenFramebuffers(1, &fbo);
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTex, 0); //フレームバッファにカラーテクスチャをアタッチ
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, positionTex, 1); //フレームバッファにカラーテクスチャをアタッチ
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, normalTex, 2); //フレームバッファにカラーテクスチャをアタッチ
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, renderb); //フレームバッファにデプスバッファとして、レンダーバッファをアタッチ
-    
-    GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
-    glDrawBuffers(3, attachments);
-    
     
     if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         return false;
@@ -180,10 +177,6 @@ int main()
     GLint viewLoc  = glGetUniformLocation( lightingShader.Program, "view" );
     GLint projLoc  = glGetUniformLocation( lightingShader.Program, "projection" );
     
-
-    Shader quad_program( "res/shaders/passthrough.vs", "res/shaders/passthrough.frag" );
-    GLuint colorTexID = 0;
-    colorTexID = glGetUniformLocation( quad_program.Program, "rendered" );
     
     while ( !glfwWindowShouldClose( window ) )
     {
@@ -209,7 +202,7 @@ int main()
         // Use cooresponding shader when setting uniforms/drawing objects
         lightingShader.Use();
         glUniform3f( lightPosLoc, lightPos.x, lightPos.y, lightPos.z );
-        glUniform3f( viewPosLoc,  camera.GetPosition( ).x, camera.GetPosition( ).y, camera.GetPosition( ).z );
+        glUniform3f( viewPosLoc,  camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z );
         glUniform3f( glGetUniformLocation( lightingShader.Program, "light.ambient" ), 0.2f, 0.2f, 0.2f );
         glUniform3f( glGetUniformLocation( lightingShader.Program, "light.diffuse" ), 0.5f, 0.5f, 0.5f );
         glUniform3f( glGetUniformLocation( lightingShader.Program, "light.specular" ), 1.0f, 1.0f, 1.0f );
@@ -241,12 +234,17 @@ int main()
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         
         
+        
         glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
         
         quad_program.Use();
         glActiveTexture( GL_TEXTURE0 );
-        glBindTexture( GL_TEXTURE_2D, colorTex );
-
+        glBindTexture( GL_TEXTURE_2D, gAlbedo );
+//        glActiveTexture( GL_TEXTURE1 );
+//        glBindTexture( GL_TEXTURE_2D, gNormal );
+//        glActiveTexture( GL_TEXTURE2 );
+//        glBindTexture( GL_TEXTURE_2D, gPosition );
+        
         drawRect.draw();
         
         // Swap the screen buffers
