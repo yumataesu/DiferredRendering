@@ -1,19 +1,17 @@
 #version 330 core
 
-in vec3 ourColor;
+// Texture samplers
+uniform sampler2D gAlbedo;
+uniform sampler2D gNormal;
+uniform sampler2D gPosition;
+
 in vec2 TexCoord;
 
 out vec4 color;
 
-
-
-// Texture samplers
-uniform sampler2D gPosition;
-uniform sampler2D gNormal;
-uniform sampler2D gAlbedo;
-
 void main()
 {
-    // Linearly interpolate between both textures (second texture is only slightly combined)
-    color = texture(gPosition, TexCoord);
+    if(TexCoord.x <= 0.3) color = texture(gNormal, TexCoord);
+    else if(TexCoord.x > 0.3 && TexCoord.x <= 0.6) color = texture(gPosition, TexCoord);
+    else if(TexCoord.x > 0.6) color = texture(gAlbedo, TexCoord);
 }
