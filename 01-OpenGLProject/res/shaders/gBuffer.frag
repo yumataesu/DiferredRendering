@@ -18,6 +18,5 @@ void main()
 {
     gPosition = vec4(FragPos, 1.0);
     gNormal = vec4(Normal, 1.0);
-    
     gAlbedo = texture(tex, TexCoords);
 }

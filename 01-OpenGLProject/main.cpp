@@ -50,9 +50,10 @@ bool firstMouse = true;
 GLfloat deltaTime = 0.0f;
 GLfloat lastFrame = 0.0f;
 
-glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
+glm::vec3 lightPos(0.0f, 0.0f, 0.0f);
 
 const int boxnum = 5000;
+
 
 int main()
 {
@@ -104,11 +105,15 @@ int main()
     GLint textureLoc = glGetUniformLocation( GeometryPass.Program, "tex" );
     
     
-    Shader lightingPass( "res/shaders/passthrough.vs", "res/shaders/passthrough.frag" );
-    //GLint renderedTextureLoc = glGetUniformLocation( lightingPass.Program, "renderedTexture" );
-    GLint gPositionLoc = glGetUniformLocation(lightingPass.Program, "gPosition");
-    GLint gNormalLoc = glGetUniformLocation(lightingPass.Program, "gNormal");
-    GLint gAlbedoloc = glGetUniformLocation(lightingPass.Program, "gAlbedo");
+    Shader LightingPass( "res/shaders/passthrough.vs", "res/shaders/passthrough.frag" );
+    GLint gPositionLoc = glGetUniformLocation(LightingPass.Program, "gPosition");
+    GLint gNormalLoc = glGetUniformLocation(LightingPass.Program, "gNormal");
+    GLint gAlbedoloc = glGetUniformLocation(LightingPass.Program, "gAlbedo");
+    GLint lightAmbloc = glGetUniformLocation(LightingPass.Program, "light.ambient");
+    GLint lightDiffloc = glGetUniformLocation(LightingPass.Program, "light.diffuse");
+    GLint lightSpecloc = glGetUniformLocation(LightingPass.Program, "light.specular");
+    GLint lightPosLoc = glGetUniformLocation(LightingPass.Program, "light.position");
+    GLint viewPosLoc = glGetUniformLocation(LightingPass.Program, "viewPos");
     
     // Load and create a texture
     GLuint tex;
@@ -182,6 +187,7 @@ int main()
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
         
+        
         glfwPollEvents();
         
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
@@ -218,7 +224,16 @@ int main()
         
         glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        lightingPass.Use();
+        LightingPass.Use();
+        glUniform3f(viewPosLoc, camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
+        glUniform3f(lightPosLoc, lightPos.x, lightPos.y, lightPos.z);
+        glUniform3f(lightAmbloc, 0.0, 0.0, 0.0);
+        glUniform3f(lightDiffloc, 0.3, 0.1, 0.3);
+        glUniform3f(lightSpecloc, 1.0, 1.0, 1.0);
+        glUniform1f( glGetUniformLocation( LightingPass.Program, "light.constant" ), 1.2 );
+        glUniform1f( glGetUniformLocation( LightingPass.Program, "light.linear" ), 0.19 );
+        glUniform1f( glGetUniformLocation( LightingPass.Program, "light.quadratic" ), 0.001 );
+        
         
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, gPosition);
