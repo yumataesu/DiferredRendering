@@ -68,7 +68,6 @@ int main()
     glfwSetInputMode( window, GLFW_CURSOR, GLFW_CURSOR_DISABLED );
     initGLEW();
     
-    glm::mat4 projection = glm::perspective( camera.GetZoom( ), ( GLfloat )SCREEN_WIDTH / ( GLfloat )SCREEN_HEIGHT, 0.1f, 100.0f );
     
     // Positions all boxes
     glm::vec3 cubePositions[boxnum];
@@ -99,85 +98,79 @@ int main()
     
     // Build and compile our shader program
     Shader GeometryPass( "res/shaders/gBuffer.vs", "res/shaders/gBuffer.frag" );
-    Shader quad_program( "res/shaders/passthrough.vs", "res/shaders/passthrough.frag" );
-    
-    
-    // Set texture units
     GLint modelLoc = glGetUniformLocation( GeometryPass.Program, "model" );
     GLint viewLoc  = glGetUniformLocation( GeometryPass.Program, "view" );
     GLint projLoc  = glGetUniformLocation( GeometryPass.Program, "projection" );
+    GLint textureLoc = glGetUniformLocation( GeometryPass.Program, "tex" );
     
     
-    //  quad_program.Use();
-//    GLint gAlbedoLoc = glGetUniformLocation(quad_program.Program, "gAlbedo");
-//    GLint gNormalLoc = glGetUniformLocation(quad_program.Program, "gNormal");
-//    GLint gPosLoc = glGetUniformLocation(quad_program.Program, "gPosition");
-
+    Shader lightingPass( "res/shaders/passthrough.vs", "res/shaders/passthrough.frag" );
+    //GLint renderedTextureLoc = glGetUniformLocation( lightingPass.Program, "renderedTexture" );
+    GLint gPositionLoc = glGetUniformLocation(lightingPass.Program, "gPosition");
+    GLint gNormalLoc = glGetUniformLocation(lightingPass.Program, "gNormal");
+    GLint gAlbedoloc = glGetUniformLocation(lightingPass.Program, "gAlbedo");
     
-    //====================================================
-    //Bind GBuffer
-
-    //color textureを用意
-    GLuint gAlbedo;
+    // Load and create a texture
+    GLuint tex;
+    
+    int width, height;
+    // ===================
+    // Texture
+    // ===================
+    glGenTextures( 1, &tex );
+    glBindTexture( GL_TEXTURE_2D, tex );
+    // Set our texture parameters
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
+    // Set texture filtering
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+    // Load, create texture and generate mipmaps
+    unsigned char *image = SOIL_load_image( "res/images/concrete.jpg", &width, &height, 0, SOIL_LOAD_RGBA );
+    glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image );
+    glGenerateMipmap( GL_TEXTURE_2D );
+    SOIL_free_image_data( image );
+    glBindTexture( GL_TEXTURE_2D, 0 );
+    
+    
+    GLuint fbo;
+    glGenFramebuffers(1, &fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    GLuint gPosition, gNormal, gAlbedo;
+    glGenTextures(1, &gPosition);
+    glBindTexture(GL_TEXTURE_2D, gPosition);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gPosition, 0);
+    
+    glGenTextures(1, &gNormal);
+    glBindTexture(GL_TEXTURE_2D, gNormal);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gNormal, 0);
+    
     glGenTextures(1, &gAlbedo);
     glBindTexture(GL_TEXTURE_2D, gAlbedo);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    
-    //normal textureを用意
-    GLuint gNormal;
-    glGenTextures(1, &gNormal);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    
-    //position textureを用意
-    GLuint gPosition;
-    glGenTextures(1, &gPosition);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    
-    
-    //depth render textureを用意
-    GLuint renderb;
-    glGenRenderbuffers(1, &renderb);
-    glBindRenderbuffer(GL_RENDERBUFFER, renderb);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, SCREEN_WIDTH, SCREEN_HEIGHT);
-    glBindRenderbuffer(GL_RENDERBUFFER, 0);
-
-    
-    //フレームバッファオブジェクトを用意
-    GLuint gBuffer;
-    glGenFramebuffers(1, &gBuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gAlbedo, 0); //フレームバッファにカラーテクスチャをアタッチ
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gNormal, 0); //フレームバッファにカラーテクスチャをアタッチ
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gPosition, 0); //フレームバッファにカラーテクスチャをアタッチ
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, renderb); //フレームバッファにデプスバッファとして、レンダーバッファをアタッチ
-    
-    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        return false;
-    
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gAlbedo, 0);
     
     GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
     glDrawBuffers(3, attachments);
     
+    GLuint rboDepth;
+    glGenRenderbuffers(1, &rboDepth);
+    glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, SCREEN_WIDTH, SCREEN_HEIGHT);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepth);
+    // - Finally check if framebuffer is complete
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "Framebuffer not complete!" << std::endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     
-    //Unbind GBuffer
-    //=====================================================
     
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     
@@ -189,66 +182,58 @@ int main()
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
         
-        glm::mat4 view = camera.GetViewMatrix();
-        
         glfwPollEvents();
+        
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
         DoMovement();
         
         glEnable(GL_LIGHTING);
         glEnable(GL_DEPTH_TEST);
         
-        glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
-        glViewport( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT );
-        glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
         
         
-        // Use cooresponding shader when setting uniforms/drawing objects
         GeometryPass.Use();
-        glUniformMatrix4fv( viewLoc, 1, GL_FALSE, glm::value_ptr( view ) );
-        glUniformMatrix4fv( projLoc, 1, GL_FALSE, glm::value_ptr( projection ) );
+        glm::mat4 projection = glm::perspective(camera.GetZoom(), (GLfloat)SCREEN_WIDTH / (GLfloat)SCREEN_HEIGHT, 0.1f, 100.0f );
+        glm::mat4 view = camera.GetViewMatrix();
         
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view) );
+        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, tex);
+        glUniform1i(textureLoc, 0);
         for(int i = 0; i < boxnum; i++)
         {
-            glm::mat4 model;
-            model = glm::mat4();
-            model = glm::translate( model, cubePositions[i] );
-            GLfloat angle = 20.0f + currentFrame * 0.2;
-            model = glm::rotate(model, angle, glm::vec3( 1.0f, 0.3f, 0.5f ) );
-            glUniformMatrix4fv( modelLoc, 1, GL_FALSE, glm::value_ptr( model ) );
+            glm::mat4 model = glm::mat4();
             
+            model = glm::translate(model, cubePositions[i]);
+            GLfloat angle = 20.0f + currentFrame * 0.2;
+            model = glm::rotate(model, angle, glm::vec3(1.0f, 0.3f, 0.5f));
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
             box.draw();
         }
-
+        
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        //glViewport( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT );
-        glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
         
-//        glActiveTexture(GL_TEXTURE0);
-//        glBindTexture(GL_TEXTURE_2D, gAlbedo);
-//        glActiveTexture(GL_TEXTURE1);
-//        glBindTexture(GL_TEXTURE_2D, gNormal);
-//        glActiveTexture(GL_TEXTURE2);
-//        glBindTexture(GL_TEXTURE_2D, gPosition);
-//        
+        glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        lightingPass.Use();
         
-//        glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-//        quad_program.Use();
-////        glUniform1i(gAlbedoLoc, 0);
-////        glUniform1i(gNormalLoc, 1);
-////        glUniform1i(gPosLoc, 2);
-//        
-//        
-//
         glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, gPosition);
+        glUniform1i(gPositionLoc, 0);
+        
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, gNormal);
+        glUniform1i(gNormalLoc, 1);
+        
+        glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, gAlbedo);
-        //drawRect.draw();
-
-        // 2.5. Copy content of geometry's depth buffer to default framebuffer's depth buffer
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, gBuffer);
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // Write to default framebuffer
-        glBlitFramebuffer(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glUniform1i(gAlbedoloc, 2);
+        
+        drawRect.draw();
+        
         
         // Swap the screen buffers
         glfwSwapBuffers(window);
@@ -279,6 +264,7 @@ GLuint loadTexture(GLuint textureID, const char* path, int imageWidth, int image
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR );
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST_MIPMAP_NEAREST );
     glBindTexture( GL_TEXTURE_2D, 0 );
+    
     
     return textureID;
 }

@@ -11,7 +11,12 @@ out vec4 color;
 
 void main()
 {
-    if(TexCoord.x <= 0.3) color = texture(gNormal, TexCoord);
-    else if(TexCoord.x > 0.3 && TexCoord.x <= 0.6) color = texture(gPosition, TexCoord);
-    else if(TexCoord.x > 0.6) color = texture(gAlbedo, TexCoord);
+    vec4 positionTexcel = texture(gPosition, TexCoord);
+    vec4 normalTexcel = texture(gNormal, TexCoord);
+    vec4 albedoTexcel = texture(gAlbedo, TexCoord);
+    color = mix(positionTexcel, normalTexcel, 0.1);
+    
+    if(TexCoord.x < 0.3) color = positionTexcel;
+    if(TexCoord.x < 0.7 && TexCoord.x >= 0.3) color = normalTexcel;
+    if(TexCoord.x >= 0.7) color = albedoTexcel;
 }
