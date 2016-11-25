@@ -52,7 +52,8 @@ GLfloat lastFrame = 0.0f;
 
 glm::vec3 lightPos(0.0f, 0.0f, 0.0f);
 
-const int boxnum = 5000;
+const int boxnum = 1000;
+const int lightnum = 20;
 
 
 int main()
@@ -72,12 +73,34 @@ int main()
     
     // Positions all boxes
     glm::vec3 cubePositions[boxnum];
-    random_device rnd;
-    mt19937 mt(rnd());
-    std::uniform_int_distribution<> x(-20.0, 20.0);
-    std::uniform_int_distribution<> y(-20.0, 20.0);
-    std::uniform_int_distribution<> z(-20.0, 20.0);
-    for(int i = 0; i < boxnum; i++){ cubePositions[i] = glm::vec3(x(mt), y(mt), z(mt)); }
+    {
+        random_device rnd;
+        mt19937 mt(rnd());
+        std::uniform_int_distribution<> x(-5.0, 5.0);
+        std::uniform_int_distribution<> y(-20.0, 20.0);
+        std::uniform_int_distribution<> z(-20.0, 20.0);
+        for(int i = 0; i < boxnum; i++){ cubePositions[i] = glm::vec3(x(mt), y(mt), z(mt)); }
+    }
+    
+    glm::vec3 lightPositions[lightnum];
+    {
+        random_device rnd;
+        mt19937 mt(rnd());
+        std::uniform_int_distribution<> x(-10.0, 10.0);
+        std::uniform_int_distribution<> y(-10.0, 10.0);
+        std::uniform_int_distribution<> z(-10.0, 10.0);
+        for(int i = 0; i < lightnum; i++){ lightPositions[i] = glm::vec3(x(mt), y(mt), z(mt)); }
+    }
+    
+    glm::vec3 lightDiffuse[lightnum];
+    {
+        random_device rnd;
+        mt19937 mt(rnd());
+        std::uniform_int_distribution<> x(0.0, 1.0);
+        std::uniform_int_distribution<> y(0.0, 1.0);
+        std::uniform_int_distribution<> z(0.0, 1.0);
+        for(int i = 0; i < lightnum; i++){ lightDiffuse[i] = glm::vec3(x(mt), y(mt), z(mt)); }
+    }
     
     Box box;
     box.setup();
@@ -105,15 +128,21 @@ int main()
     GLint textureLoc = glGetUniformLocation( GeometryPass.Program, "tex" );
     
     
-    Shader LightingPass( "res/shaders/passthrough.vs", "res/shaders/passthrough.frag" );
+    Shader LightingPass( "res/shaders/lighting.vs", "res/shaders/lighting.frag" );
     GLint gPositionLoc = glGetUniformLocation(LightingPass.Program, "gPosition");
     GLint gNormalLoc = glGetUniformLocation(LightingPass.Program, "gNormal");
     GLint gAlbedoloc = glGetUniformLocation(LightingPass.Program, "gAlbedo");
-    GLint lightAmbloc = glGetUniformLocation(LightingPass.Program, "light.ambient");
-    GLint lightDiffloc = glGetUniformLocation(LightingPass.Program, "light.diffuse");
-    GLint lightSpecloc = glGetUniformLocation(LightingPass.Program, "light.specular");
-    GLint lightPosLoc = glGetUniformLocation(LightingPass.Program, "light.position");
     GLint viewPosLoc = glGetUniformLocation(LightingPass.Program, "viewPos");
+    
+    
+    GLint lightAmbloc[lightnum], lightDiffloc[lightnum], lightSpecloc[lightnum], lightPosLoc[lightnum];
+    for(int i = 0; i < lightnum; i++)
+    {
+        lightAmbloc[i] = glGetUniformLocation(LightingPass.Program, ("light["+to_string(i)+"].ambient").c_str());
+        lightDiffloc[i] = glGetUniformLocation(LightingPass.Program, ("light["+to_string(i)+"].diffuse").c_str());
+        lightSpecloc[i] = glGetUniformLocation(LightingPass.Program, ("light["+to_string(i)+"].specular").c_str());
+        lightPosLoc[i] = glGetUniformLocation(LightingPass.Program, ("light["+to_string(i)+"].position").c_str());
+    }
     
     // Load and create a texture
     GLuint tex;
@@ -222,18 +251,26 @@ int main()
         
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         
+        
+        
         glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         LightingPass.Use();
         glUniform3f(viewPosLoc, camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
-        glUniform3f(lightPosLoc, lightPos.x, lightPos.y, lightPos.z);
-        glUniform3f(lightAmbloc, 0.0, 0.0, 0.0);
-        glUniform3f(lightDiffloc, 0.3, 0.1, 0.3);
-        glUniform3f(lightSpecloc, 1.0, 1.0, 1.0);
+        
+        glm::vec3 lightAmbient = glm::vec3(0.0, 0.0, 0.0);
+        glm::vec3 lightSpecular = glm::vec3(1.0, 1.0, 1.0);
+        for(int i = 0; i < lightnum; i++)
+        {
+            glUniform3fv(lightPosLoc[i], 1, &lightPositions[i][0]);
+            glUniform3fv(lightAmbloc[i], 1, glm::value_ptr(lightAmbient));
+            glUniform3fv(lightDiffloc[i], 1, &lightDiffuse[i][0]);
+            glUniform3fv(lightSpecloc[i], 1, glm::value_ptr(lightSpecular));
+        }
+        
         glUniform1f( glGetUniformLocation( LightingPass.Program, "light.constant" ), 1.2 );
         glUniform1f( glGetUniformLocation( LightingPass.Program, "light.linear" ), 0.19 );
         glUniform1f( glGetUniformLocation( LightingPass.Program, "light.quadratic" ), 0.001 );
-        
         
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, gPosition);
