@@ -50,9 +50,8 @@ bool firstMouse = true;
 GLfloat deltaTime = 0.0f;
 GLfloat lastFrame = 0.0f;
 
-glm::vec3 lightPos(0.0f, 0.0f, 0.0f);
 
-const int boxnum = 1100;
+const int boxnum = 200;
 const int lightnum = 10;
 
 
@@ -82,6 +81,14 @@ int main()
         for(int i = 0; i < boxnum; i++){ cubePositions[i] = glm::vec3(x(mt), y(mt), z(mt)); }
     }
     
+    glm::vec3 cubeSize[boxnum];
+    {
+        random_device rnd;
+        mt19937 mt(rnd());
+        std::uniform_int_distribution<> x(1.0, 3.0);
+        for(int i = 0; i < boxnum; i++){ cubeSize[i] = glm::vec3(x(mt), x(mt), x(mt)); }
+    }
+    
     glm::vec3 lightPositions[lightnum];
     {
         random_device rnd;
@@ -99,11 +106,14 @@ int main()
         std::uniform_int_distribution<> x(0.0, 1.0);
         std::uniform_int_distribution<> y(0.0, 1.0);
         std::uniform_int_distribution<> z(0.0, 1.0);
-        for(int i = 0; i < lightnum; i++){ lightDiffuse[i] = glm::vec3(0.0, y(mt), z(mt)); }
+        for(int i = 0; i < lightnum; i++){ lightDiffuse[i] = glm::vec3(0.0, 0.5, z(mt)); }
     }
     
     Box box;
     box.setup();
+    
+    Box lightbox;
+    lightbox.setup();
     
     Rect drawRect;
     drawRect.setup();
@@ -126,6 +136,7 @@ int main()
     GLint viewLoc  = glGetUniformLocation( GeometryPass.Program, "view" );
     GLint projLoc  = glGetUniformLocation( GeometryPass.Program, "projection" );
     GLint textureLoc = glGetUniformLocation( GeometryPass.Program, "tex" );
+    GLint normaltextureLoc = glGetUniformLocation( GeometryPass.Program, "normaltex" );
     
     
     Shader LightingPass( "res/shaders/lighting.vs", "res/shaders/lighting.frag" );
@@ -134,6 +145,11 @@ int main()
     GLint gAlbedoloc = glGetUniformLocation(LightingPass.Program, "gAlbedo");
     GLint viewPosLoc = glGetUniformLocation(LightingPass.Program, "viewPos");
     
+    
+//    Shader LightDraw( "res/shaders/lightdraw.vs", "res/shaders/lightdraw.frag" );
+//    GLint lightmodelLoc = glGetUniformLocation( LightDraw.Program, "model" );
+//    GLint lightviewLoc  = glGetUniformLocation( LightDraw.Program, "view" );
+//    GLint lightprojLoc  = glGetUniformLocation( LightDraw.Program, "projection" );
     
     GLint lightAmbloc[lightnum], lightDiffloc[lightnum], lightSpecloc[lightnum], lightPosLoc[lightnum];
     for(int i = 0; i < lightnum; i++)
@@ -164,6 +180,27 @@ int main()
     glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image );
     glGenerateMipmap( GL_TEXTURE_2D );
     SOIL_free_image_data( image );
+    glBindTexture( GL_TEXTURE_2D, 0 );
+    
+    // Load and create a texture
+    GLuint normaltex;
+    int normalwidth, normalheight;
+    // ===================
+    // Texture
+    // ===================
+    glGenTextures( 1, &normaltex );
+    glBindTexture( GL_TEXTURE_2D, normaltex );
+    // Set our texture parameters
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
+    // Set texture filtering
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+    // Load, create texture and generate mipmaps
+    unsigned char *normalimage = SOIL_load_image( "res/images/random.png", &normalwidth, &normalheight, 0, SOIL_LOAD_RGBA );
+    glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, normalimage );
+    glGenerateMipmap( GL_TEXTURE_2D );
+    SOIL_free_image_data( normalimage );
     glBindTexture( GL_TEXTURE_2D, 0 );
     
     
@@ -221,8 +258,7 @@ int main()
         
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
         DoMovement();
-        
-        glEnable(GL_LIGHTING);
+
         glEnable(GL_DEPTH_TEST);
         glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -238,24 +274,47 @@ int main()
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, tex);
         glUniform1i(textureLoc, 0);
+        
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, normaltex);
+        glUniform1i(normaltextureLoc, 1);
+
         for(int i = 0; i < boxnum; i++)
         {
+            //cubePositions[i].x += 0.05;
             glm::mat4 model = glm::mat4();
-            
+            GLfloat angle = 20.0f + currentFrame * 0.3;
             model = glm::translate(model, cubePositions[i]);
-            //GLfloat angle = 20.0f + currentFrame * 0.2;
-            //model = glm::rotate(model, angle, glm::vec3(1.0f, 0.3f, 0.5f));
+            model = glm::rotate(model, angle, glm::vec3(1.0f, 0.3f, 0.5f));
+            model = glm::scale(model, cubeSize[i]);
             glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
             box.draw();
+            
+            //if(cubePositions[i].x > 30) cubePositions[i].x = -30;
         }
         
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+//        LightDraw.Use();
+//        glUniformMatrix4fv(lightviewLoc, 1, GL_FALSE, glm::value_ptr(view));
+//        glUniformMatrix4fv(lightprojLoc, 1, GL_FALSE, glm::value_ptr(projection));
+//
+//        for(int i = 0; i < lightnum; i++)
+//        {
+//            glm::mat4 model = glm::mat4();
+//            model = glm::translate(model, lightPositions[i]);
+//            model = glm::scale(model, glm::vec3(0.15f));
+//            glUniformMatrix4fv(glGetUniformLocation(LightDraw.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+//            glUniform3fv(glGetUniformLocation(LightDraw.Program, "lightColor"), 1, &lightDiffuse[i][0]);
+//            
+//            lightbox.draw();
+//        }
         
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
         
         
         glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
         glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glDisable(GL_DEPTH_TEST);
         LightingPass.Use();
         glUniform3f(viewPosLoc, camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
         
