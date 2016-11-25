@@ -52,8 +52,8 @@ GLfloat lastFrame = 0.0f;
 
 glm::vec3 lightPos(0.0f, 0.0f, 0.0f);
 
-const int boxnum = 1000;
-const int lightnum = 20;
+const int boxnum = 1100;
+const int lightnum = 10;
 
 
 int main()
@@ -76,9 +76,9 @@ int main()
     {
         random_device rnd;
         mt19937 mt(rnd());
-        std::uniform_int_distribution<> x(-5.0, 5.0);
-        std::uniform_int_distribution<> y(-20.0, 20.0);
-        std::uniform_int_distribution<> z(-20.0, 20.0);
+        std::uniform_int_distribution<> x(-15.0, 15.0);
+        std::uniform_int_distribution<> y(-15.0, 15.0);
+        std::uniform_int_distribution<> z(-15.0, 15.0);
         for(int i = 0; i < boxnum; i++){ cubePositions[i] = glm::vec3(x(mt), y(mt), z(mt)); }
     }
     
@@ -86,9 +86,9 @@ int main()
     {
         random_device rnd;
         mt19937 mt(rnd());
-        std::uniform_int_distribution<> x(-10.0, 10.0);
-        std::uniform_int_distribution<> y(-10.0, 10.0);
-        std::uniform_int_distribution<> z(-10.0, 10.0);
+        std::uniform_int_distribution<> x(-5.0, 5.0);
+        std::uniform_int_distribution<> y(-5.0, 5.0);
+        std::uniform_int_distribution<> z(-5.0, 5.0);
         for(int i = 0; i < lightnum; i++){ lightPositions[i] = glm::vec3(x(mt), y(mt), z(mt)); }
     }
     
@@ -99,7 +99,7 @@ int main()
         std::uniform_int_distribution<> x(0.0, 1.0);
         std::uniform_int_distribution<> y(0.0, 1.0);
         std::uniform_int_distribution<> z(0.0, 1.0);
-        for(int i = 0; i < lightnum; i++){ lightDiffuse[i] = glm::vec3(x(mt), y(mt), z(mt)); }
+        for(int i = 0; i < lightnum; i++){ lightDiffuse[i] = glm::vec3(0.0, y(mt), z(mt)); }
     }
     
     Box box;
@@ -224,7 +224,7 @@ int main()
         
         glEnable(GL_LIGHTING);
         glEnable(GL_DEPTH_TEST);
-        
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
         
@@ -243,8 +243,8 @@ int main()
             glm::mat4 model = glm::mat4();
             
             model = glm::translate(model, cubePositions[i]);
-            GLfloat angle = 20.0f + currentFrame * 0.2;
-            model = glm::rotate(model, angle, glm::vec3(1.0f, 0.3f, 0.5f));
+            //GLfloat angle = 20.0f + currentFrame * 0.2;
+            //model = glm::rotate(model, angle, glm::vec3(1.0f, 0.3f, 0.5f));
             glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
             box.draw();
         }
@@ -254,6 +254,7 @@ int main()
         
         
         glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         LightingPass.Use();
         glUniform3f(viewPosLoc, camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
@@ -285,6 +286,12 @@ int main()
         glUniform1i(gAlbedoloc, 2);
         
         drawRect.draw();
+        // 2.5. Copy content of geometry's depth buffer to default framebuffer's depth buffer
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // Write to default framebuffer
+        glBlitFramebuffer(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        
         
         
         // Swap the screen buffers

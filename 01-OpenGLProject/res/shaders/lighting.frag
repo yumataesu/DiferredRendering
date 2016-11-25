@@ -15,7 +15,7 @@ uniform sampler2D gNormal;
 uniform sampler2D gPosition;
 uniform vec3 viewPos;
 
-const int LightNum = 20;
+const int LightNum = 10;
 uniform Light light[LightNum];
 
 in vec2 TexCoord;
@@ -24,7 +24,7 @@ out vec4 color;
 
 const float constant = 1.2;
 const float linear = 0.19;
-const float quadratic = 0.001;
+const float quadratic = 0.00001;
 
 void main()
 {
