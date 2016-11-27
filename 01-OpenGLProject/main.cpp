@@ -35,7 +35,6 @@ void MouseCallback( GLFWwindow *window, double xPos, double yPos );
 void DoMovement();
 void setObjects();
 void init();
-GLuint loadTexture(GLuint textureID, const char* path, int imageWidth, int imageHeight);
 bool checkWindow(GLFWwindow *window);
 bool initGLEW();
 void RenderQuad();
@@ -118,13 +117,6 @@ int main()
     Rect drawRect;
     drawRect.setup();
     
-    //Load textures
-    GLuint diffuseMap, specularMap;
-    int imageWidth, imageHeight;
-    const char* diffusepath = "res/images/concrete.jpg";
-    const char* specularpath = "res/images/container2_specular.png";
-    diffuseMap = loadTexture(diffuseMap, diffusepath, imageWidth, imageHeight);
-    specularMap = loadTexture(diffuseMap, specularpath, imageWidth, imageHeight);
     
     // Define the viewport dimensions
     glViewport( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT );
@@ -146,10 +138,6 @@ int main()
     GLint viewPosLoc = glGetUniformLocation(LightingPass.Program, "viewPos");
     
     
-//    Shader LightDraw( "res/shaders/lightdraw.vs", "res/shaders/lightdraw.frag" );
-//    GLint lightmodelLoc = glGetUniformLocation( LightDraw.Program, "model" );
-//    GLint lightviewLoc  = glGetUniformLocation( LightDraw.Program, "view" );
-//    GLint lightprojLoc  = glGetUniformLocation( LightDraw.Program, "projection" );
     
     GLint lightAmbloc[lightnum], lightDiffloc[lightnum], lightSpecloc[lightnum], lightPosLoc[lightnum];
     for(int i = 0; i < lightnum; i++)
@@ -293,20 +281,6 @@ int main()
             //if(cubePositions[i].x > 30) cubePositions[i].x = -30;
         }
         
-//        LightDraw.Use();
-//        glUniformMatrix4fv(lightviewLoc, 1, GL_FALSE, glm::value_ptr(view));
-//        glUniformMatrix4fv(lightprojLoc, 1, GL_FALSE, glm::value_ptr(projection));
-//
-//        for(int i = 0; i < lightnum; i++)
-//        {
-//            glm::mat4 model = glm::mat4();
-//            model = glm::translate(model, lightPositions[i]);
-//            model = glm::scale(model, glm::vec3(0.15f));
-//            glUniformMatrix4fv(glGetUniformLocation(LightDraw.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
-//            glUniform3fv(glGetUniformLocation(LightDraw.Program, "lightColor"), 1, &lightDiffuse[i][0]);
-//            
-//            lightbox.draw();
-//        }
         
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         
@@ -358,33 +332,14 @@ int main()
     }
     
     box.release();
-    glDeleteTextures(1, &diffuseMap);
-    glDeleteTextures(1, &specularMap);
+    glDeleteTextures(1, &gPosition);
+    glDeleteTextures(1, &gNormal);
+    glDeleteTextures(1, &gAlbedo);
     
     // Terminate GLFW, clearing any resources allocated by GLFW.
     glfwTerminate( );
     
     return 0;
-}
-
-GLuint loadTexture(GLuint textureID, const char* path, int imageWidth, int imageHeight)
-{
-    unsigned char *image;
-    glGenTextures( 1, &textureID );
-    
-    image = SOIL_load_image(path, &imageWidth, &imageHeight, 0, SOIL_LOAD_RGB);
-    glBindTexture( GL_TEXTURE_2D, textureID );
-    glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, imageWidth, imageHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, image );
-    glGenerateMipmap( GL_TEXTURE_2D );
-    SOIL_free_image_data( image );
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR );
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST_MIPMAP_NEAREST );
-    glBindTexture( GL_TEXTURE_2D, 0 );
-    
-    
-    return textureID;
 }
 
 
