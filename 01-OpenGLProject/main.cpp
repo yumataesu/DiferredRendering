@@ -50,8 +50,8 @@ GLfloat deltaTime = 0.0f;
 GLfloat lastFrame = 0.0f;
 
 
-const int boxnum = 200;
-const int lightnum = 10;
+const int boxnum = 1500;
+const int lightnum = 5;
 
 
 int main()
@@ -67,16 +67,16 @@ int main()
     glfwSetCursorPosCallback( window, MouseCallback );
     glfwSetInputMode( window, GLFW_CURSOR, GLFW_CURSOR_DISABLED );
     initGLEW();
-    
+    std::cout << glGetError() << std::endl; //Retreve GLEW always returns 1280
     
     // Positions all boxes
     glm::vec3 cubePositions[boxnum];
     {
         random_device rnd;
         mt19937 mt(rnd());
-        std::uniform_int_distribution<> x(-15.0, 15.0);
-        std::uniform_int_distribution<> y(-15.0, 15.0);
-        std::uniform_int_distribution<> z(-15.0, 15.0);
+        std::uniform_int_distribution<> x(-50.0, 50.0);
+        std::uniform_int_distribution<> y(-50.0, 50.0);
+        std::uniform_int_distribution<> z(-50.0, 50.0);
         for(int i = 0; i < boxnum; i++){ cubePositions[i] = glm::vec3(x(mt), y(mt), z(mt)); }
     }
     
@@ -84,7 +84,7 @@ int main()
     {
         random_device rnd;
         mt19937 mt(rnd());
-        std::uniform_int_distribution<> x(1.0, 3.0);
+        std::uniform_int_distribution<> x(1.0, 5.5);
         for(int i = 0; i < boxnum; i++){ cubeSize[i] = glm::vec3(x(mt), x(mt), x(mt)); }
     }
     
@@ -92,9 +92,9 @@ int main()
     {
         random_device rnd;
         mt19937 mt(rnd());
-        std::uniform_int_distribution<> x(-5.0, 5.0);
-        std::uniform_int_distribution<> y(-5.0, 5.0);
-        std::uniform_int_distribution<> z(-5.0, 5.0);
+        std::uniform_int_distribution<> x(-15.0, 15.0);
+        std::uniform_int_distribution<> y(-15.0, 15.0);
+        std::uniform_int_distribution<> z(-15.0, 15.0);
         for(int i = 0; i < lightnum; i++){ lightPositions[i] = glm::vec3(x(mt), y(mt), z(mt)); }
     }
     
@@ -105,7 +105,7 @@ int main()
         std::uniform_int_distribution<> x(0.0, 1.0);
         std::uniform_int_distribution<> y(0.0, 1.0);
         std::uniform_int_distribution<> z(0.0, 1.0);
-        for(int i = 0; i < lightnum; i++){ lightDiffuse[i] = glm::vec3(0.0, 0.5, z(mt)); }
+        for(int i = 0; i < lightnum; i++){ lightDiffuse[i] = glm::vec3(x(mt), y(mt), z(mt)); }
     }
     
     Box box;
@@ -191,16 +191,18 @@ int main()
     SOIL_free_image_data( normalimage );
     glBindTexture( GL_TEXTURE_2D, 0 );
     
-    
-    GLuint fbo;
-    glGenFramebuffers(1, &fbo);
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+    GLuint gBUffer;
+    glGenFramebuffers(1, &gBUffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, gBUffer);
     GLuint gPosition, gNormal, gAlbedo;
     glGenTextures(1, &gPosition);
     glBindTexture(GL_TEXTURE_2D, gPosition);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gPosition, 0);
     
     glGenTextures(1, &gNormal);
@@ -212,10 +214,11 @@ int main()
     
     glGenTextures(1, &gAlbedo);
     glBindTexture(GL_TEXTURE_2D, gAlbedo);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gAlbedo, 0);
+    
     
     GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
     glDrawBuffers(3, attachments);
@@ -243,22 +246,24 @@ int main()
         
         
         glfwPollEvents();
-        
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
         DoMovement();
-
         glEnable(GL_DEPTH_TEST);
-        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        
+        glm::mat4 projection = glm::perspective(camera.GetZoom(), (GLfloat)SCREEN_WIDTH / (GLfloat)SCREEN_HEIGHT, 0.1f, 100.0f );
+        glm::mat4 view = camera.GetViewMatrix();
+        
+        glBindFramebuffer(GL_FRAMEBUFFER, gBUffer);
+        
+        
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
         
         
         GeometryPass.Use();
-        glm::mat4 projection = glm::perspective(camera.GetZoom(), (GLfloat)SCREEN_WIDTH / (GLfloat)SCREEN_HEIGHT, 0.1f, 100.0f );
-        glm::mat4 view = camera.GetViewMatrix();
-        
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view) );
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+        
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, tex);
         glUniform1i(textureLoc, 0);
@@ -271,18 +276,18 @@ int main()
         {
             //cubePositions[i].x += 0.05;
             glm::mat4 model = glm::mat4();
-            GLfloat angle = 20.0f + currentFrame * 0.3;
             model = glm::translate(model, cubePositions[i]);
-            model = glm::rotate(model, angle, glm::vec3(1.0f, 0.3f, 0.5f));
+            //GLfloat angle = 20.0f + currentFrame * 0.3;
+            //model = glm::rotate(model, angle, glm::vec3(1.0f, 0.3f, 0.5f));
             model = glm::scale(model, cubeSize[i]);
             glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
             box.draw();
             
             //if(cubePositions[i].x > 30) cubePositions[i].x = -30;
         }
-        
-        
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        
+        
         
         
         glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -319,12 +324,13 @@ int main()
         glUniform1i(gAlbedoloc, 2);
         
         drawRect.draw();
+        
         // 2.5. Copy content of geometry's depth buffer to default framebuffer's depth buffer
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, gBUffer);
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // Write to default framebuffer
         glBlitFramebuffer(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        
+
         
         
         // Swap the screen buffers

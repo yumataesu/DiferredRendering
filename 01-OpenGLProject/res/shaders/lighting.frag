@@ -15,16 +15,16 @@ uniform sampler2D gNormal;
 uniform sampler2D gPosition;
 uniform vec3 viewPos;
 
-const int LightNum = 10;
+const int LightNum = 5;
 uniform Light light[LightNum];
 
 in vec2 TexCoord;
 
 out vec4 color;
 
-const float constant = 1.2;
-const float linear = 0.19;
-const float quadratic = 0.00001;
+const float constant = 3.0;
+const float linear = 2.0;
+const float quadratic = 0.1;
 
 void main()
 {
@@ -32,42 +32,29 @@ void main()
     vec4 normalTexcel = texture(gNormal, TexCoord);
     vec4 albedoTexcel = texture(gAlbedo, TexCoord);
     
-    vec4 totalAmbient = vec4(0.0, 0.0, 0.0, 0.0);
-    vec4 totalDiffuse = vec4(0.0, 0.0, 0.0, 0.0);
-    vec4 totalSpecular = vec4(0.0, 0.0, 0.0, 0.0);
-    
+    vec3 lighting = albedoTexcel.rgb * 0.1; // hard-coded ambient component
+    vec3 viewDir = normalize(viewPos - positionTexcel.xyz);
     for(int i = 0; i < LightNum; i++)
     {
-        //Ambient light
-        vec4 ambient = albedoTexcel;
         
-        //Diffuse light
-        vec3 toLightVector = light[i].position - positionTexcel.rgb;
-        vec3 unitLightVector = normalize(toLightVector);
-        float nDotl = dot(normalTexcel.rgb, unitLightVector);
-        float brightness = max(nDotl, 0.0);
-        vec4 diffuse = vec4(brightness * light[i].diffuse, 1.0);
-
-        //Specular
-        vec3 toCameraVector = viewPos - positionTexcel.rgb;
-        vec3 uintVectorToCamera = normalize(toCameraVector);
-        vec3 lightDirection = -unitLightVector;
-        vec3 reflectedLightDirection = reflect(lightDirection, normalTexcel.rgb);
-        float specularFactor = dot(reflectedLightDirection, uintVectorToCamera);
-        specularFactor = max(specularFactor, 0.0);
-        float dampedFactor = pow(specularFactor, 20.0);
-        vec4 specular = vec4(dampedFactor * light[i].specular.r, dampedFactor * light[i].specular.g, dampedFactor * light[i].specular.b, 1.0);
+        // Diffuse
+        vec3 lightDir = normalize(light[i].position - positionTexcel.xyz);
+        vec3 diffuse = max(dot(normalTexcel.xyz, lightDir), 0.0) * albedoTexcel.rgb * light[i].diffuse;
+        
+        // Specular
+        vec3 halfwayDir = normalize(lightDir + viewDir);
+        float spec = pow(max(dot(normalTexcel.xyz, halfwayDir), 0.0), 16.0);
+        vec3 specular = light[i].specular * spec;
         
         //Attenuation
-        float dist = length(toLightVector) * 10.5;
+        vec3 toLightVector = light[i].position - positionTexcel.rgb;
+        float dist = length(toLightVector);
         float attenuation = constant + (linear * dist) + (quadratic * dist * dist);
         
-        
-        totalAmbient = ambient / attenuation;
-        totalDiffuse += diffuse / attenuation;
-        totalSpecular += specular / attenuation;
+        lighting += albedoTexcel.rgb / attenuation;
+        //lighting += diffuse / attenuation;
+        //lighting += specular / attenuation;
     }
     
-    
-    color = totalAmbient + totalDiffuse + totalSpecular;
+    color = vec4(lighting, 1.0);
 }
