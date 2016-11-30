@@ -22,20 +22,22 @@ in vec2 TexCoord;
 
 out vec4 color;
 
-const float constant = 3.0;
-const float linear = 2.0;
-const float quadratic = 0.1;
+const float constant = 1.0;
+const float linear = 0.5;
+const float quadratic = 1.8;
 
 void main()
 {
     vec4 positionTexcel = texture(gPosition, TexCoord);
     vec4 normalTexcel = texture(gNormal, TexCoord);
-    vec4 albedoTexcel = texture(gAlbedo, TexCoord);
+    vec3 albedoTexcel = texture(gAlbedo, TexCoord).rgb;
     
     vec3 lighting = albedoTexcel.rgb * 0.1; // hard-coded ambient component
     vec3 viewDir = normalize(viewPos - positionTexcel.xyz);
     for(int i = 0; i < LightNum; i++)
     {
+        
+        vec3 ambient = albedoTexcel.rgb;
         
         // Diffuse
         vec3 lightDir = normalize(light[i].position - positionTexcel.xyz);
@@ -48,12 +50,14 @@ void main()
         
         //Attenuation
         vec3 toLightVector = light[i].position - positionTexcel.rgb;
-        float dist = length(toLightVector);
-        float attenuation = constant + (linear * dist) + (quadratic * dist * dist);
+        float dist = length(toLightVector) * 2.0;
+        float attenuation = 1.0 / constant + (linear * dist) + (quadratic * dist * dist);
         
-        lighting += albedoTexcel.rgb / attenuation;
-        //lighting += diffuse / attenuation;
-        //lighting += specular / attenuation;
+        //albedoTexcel *= attenuation;
+        //diffuse *= attenuation;
+        //specular *= attenuation;
+        
+        lighting = albedoTexcel;
     }
     
     color = vec4(lighting, 1.0);
