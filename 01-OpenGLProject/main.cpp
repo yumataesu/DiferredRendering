@@ -150,11 +150,11 @@ int main()
     GLint sNormalLoc = glGetUniformLocation(ssaoPass.Program, "gNormal");
     GLint sprojLoc  = glGetUniformLocation(ssaoPass.Program, "projection");
     GLint stexNoiseLoc = glGetUniformLocation(ssaoPass.Program, "texNoise");
-    GLint ssampleLoc[64];
-    for(int i = 0; i < 64; i++)
-    {
-        //ssampleLoc[i] = glGetUniformLocation(ssaoPass.Program, ("samples["+to_string(i)+"]").c_str());
-    }
+//    GLint ssampleLoc[64];
+//    for(int i = 0; i < 64; i++)
+//    {
+//        //ssampleLoc[i] = glGetUniformLocation(ssaoPass.Program, ("samples["+to_string(i)+"]").c_str());
+//    }
     
     Shader LightingPass( "res/shaders/lighting.vs", "res/shaders/lighting.frag" );
     GLint gPositionLoc = glGetUniformLocation(LightingPass.Program, "gPosition");
@@ -294,10 +294,6 @@ int main()
         ssaoKernel.push_back(sample);
     }
     
-//    for (GLuint i = 0; i < 256; ++i)
-//    {
-//        cout << "karnel["<<i<<"]="<<"new PVector(" << ssaoKernel[i].x * 50 << ", " << ssaoKernel[i].y  * 50 << ", " << ssaoKernel[i].z  * 50 << ");" << endl;
-//    }
     // Noise texture
     std::vector<glm::vec3> ssaoNoise;
     for (GLuint i = 0; i < 16; i++)
@@ -329,11 +325,13 @@ int main()
         glfwPollEvents();
         DoMovement();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        
         glm::mat4 view = camera.GetViewMatrix();
         
+        
+        //Geometry Pass
         glBindFramebuffer(GL_FRAMEBUFFER, gBUffer);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        
         GeometryPass.Use();
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
@@ -361,50 +359,35 @@ int main()
         }
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         
-        
+        //SSAO Pass
         glBindFramebuffer(GL_FRAMEBUFFER, ssaoFbo);
-        glClear(GL_COLOR_BUFFER_BIT);
-        ssaoPass.Use();
-        for(int i = 0; i < 64; i++)
-            glUniform3fv(glGetUniformLocation(ssaoPass.Program, ("samples["+to_string(i)+"]").c_str()), 1, &ssaoKernel[i][0]);
-        glUniformMatrix4fv(sprojLoc, 1, GL_FALSE, glm::value_ptr(projection));
-        
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, gPosition);
-        glUniform1i(sPositionLoc, 0);
+            glClear(GL_COLOR_BUFFER_BIT);
+            ssaoPass.Use();
+            for(int i = 0; i < 64; i++)
+            {
+                glUniform3fv(glGetUniformLocation(ssaoPass.Program, ("samples["+to_string(i)+"]").c_str()), 1, &ssaoKernel[i][0]);
+            }
+            glUniformMatrix4fv(sprojLoc, 1, GL_FALSE, glm::value_ptr(projection));
+            
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, gPosition);
+            glUniform1i(sPositionLoc, 0);
 
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, gNormal);
-        glUniform1i(sNormalLoc, 1);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, gNormal);
+            glUniform1i(sNormalLoc, 1);
 
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, noiseTexture);
-        glUniform1i(stexNoiseLoc, 2);
-        
-        drawRect.draw();
-        
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, noiseTexture);
+            glUniform1i(stexNoiseLoc, 2);
+            
+            drawRect.draw();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         
         
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         LightingPass.Use();
-        glUniform3f(viewPosLoc, camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
-        
-        glm::vec3 lightAmbient = glm::vec3(0.0, 0.0, 0.0);
-        glm::vec3 lightSpecular = glm::vec3(1.0, 1.0, 1.0);
-        for(int i = 0; i < lightnum; i++)
-        {
-            glUniform3fv(lightPosLoc[i], 1, &lightPositions[i][0]);
-            glUniform3fv(lightAmbloc[i], 1, glm::value_ptr(lightAmbient));
-            glUniform3fv(lightDiffloc[i], 1, &lightDiffuse[i][0]);
-            glUniform3fv(lightSpecloc[i], 1, glm::value_ptr(lightSpecular));
-        }
-        
-        glUniform1f( glGetUniformLocation( LightingPass.Program, "light.constant" ), 1.2 );
-        glUniform1f( glGetUniformLocation( LightingPass.Program, "light.linear" ), 0.19 );
-        glUniform1f( glGetUniformLocation( LightingPass.Program, "light.quadratic" ), 0.001 );
-        
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, gPosition);
         glUniform1i(gPositionLoc, 0);
@@ -421,6 +404,22 @@ int main()
         glBindTexture(GL_TEXTURE_2D, ssaoColorBuffer);
         glUniform1i(ssaoloc, 3);
         
+        
+        glUniform3f(viewPosLoc, camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
+        glm::vec3 lightAmbient = glm::vec3(0.0, 0.0, 0.0);
+        glm::vec3 lightSpecular = glm::vec3(1.0, 1.0, 1.0);
+        for(int i = 0; i < lightnum; i++)
+        {
+            glUniform3fv(lightPosLoc[i], 1, &lightPositions[i][0]);
+            glUniform3fv(lightAmbloc[i], 1, glm::value_ptr(lightAmbient));
+            glUniform3fv(lightDiffloc[i], 1, &lightDiffuse[i][0]);
+            glUniform3fv(lightSpecloc[i], 1, glm::value_ptr(lightSpecular));
+        }
+        
+        glUniform1f( glGetUniformLocation( LightingPass.Program, "light.constant" ), 1.2 );
+        glUniform1f( glGetUniformLocation( LightingPass.Program, "light.linear" ), 0.19 );
+        glUniform1f( glGetUniformLocation( LightingPass.Program, "light.quadratic" ), 0.001 );
+        
         drawRect.draw();
         
         
@@ -428,10 +427,10 @@ int main()
         
 //
         // 2.5. Copy content of geometry's depth buffer to default framebuffer's depth buffer
-//        glBindFramebuffer(GL_READ_FRAMEBUFFER, gBUffer);
-//        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // Write to default framebuffer
-//        glBlitFramebuffer(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-//        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, gBUffer);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // Write to default framebuffer
+        glBlitFramebuffer(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         
         

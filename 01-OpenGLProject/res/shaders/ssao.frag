@@ -48,6 +48,5 @@ void main()
     }
     occlusion = 1.0 - (occlusion / kernelSize);
     
-    
     color = vec4(occlusion, occlusion, occlusion, 1.0);
 }
