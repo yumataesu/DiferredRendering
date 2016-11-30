@@ -40,7 +40,7 @@ bool initGLEW();
 void RenderQuad();
 
 // Camera
-Camera  camera(glm::vec3( 0.0f, 0.0f, 6.0f ) );
+Camera  camera(glm::vec3( 0.0f, 0.0f, 10.0f ) );
 GLfloat lastX = WIDTH / 2.0;
 GLfloat lastY = HEIGHT / 2.0;
 bool keys[1024];
@@ -50,13 +50,27 @@ GLfloat deltaTime = 0.0f;
 GLfloat lastFrame = 0.0f;
 
 
-const int boxnum = 1500;
+const int boxnum = 10;
 const int lightnum = 5;
 
+GLfloat lerp(GLfloat a, GLfloat b, GLfloat f)
+{
+    return a + f * (b - a);
+}
 
 int main()
 {
-    init();
+    
+    // Init GLFW
+    glfwInit( );
+    // Set all the required options for GLFW
+    glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, 3 );
+    glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, 3 );
+    glfwWindowHint( GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE );
+    glfwWindowHint( GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE );
+    glfwWindowHint( GLFW_RESIZABLE, GL_FALSE );
+    
+    
     // Create a GLFWwindow object that we can use for GLFW's functions
     GLFWwindow* window = glfwCreateWindow( WIDTH, HEIGHT, "Diferred Rendering", nullptr, nullptr );
     checkWindow(window);
@@ -74,9 +88,9 @@ int main()
     {
         random_device rnd;
         mt19937 mt(rnd());
-        std::uniform_int_distribution<> x(-50.0, 50.0);
-        std::uniform_int_distribution<> y(-50.0, 50.0);
-        std::uniform_int_distribution<> z(-50.0, 50.0);
+        std::uniform_int_distribution<> x(-5.0, 5.0);
+        std::uniform_int_distribution<> y(-5.0, 5.0);
+        std::uniform_int_distribution<> z(-5.0, 5.0);
         for(int i = 0; i < boxnum; i++){ cubePositions[i] = glm::vec3(x(mt), y(mt), z(mt)); }
     }
     
@@ -92,9 +106,9 @@ int main()
     {
         random_device rnd;
         mt19937 mt(rnd());
-        std::uniform_int_distribution<> x(-15.0, 15.0);
-        std::uniform_int_distribution<> y(-15.0, 15.0);
-        std::uniform_int_distribution<> z(-15.0, 15.0);
+        std::uniform_int_distribution<> x(-35.0, 35.0);
+        std::uniform_int_distribution<> y(-35.0, 35.0);
+        std::uniform_int_distribution<> z(-35.0, 35.0);
         for(int i = 0; i < lightnum; i++){ lightPositions[i] = glm::vec3(x(mt), y(mt), z(mt)); }
     }
     
@@ -117,6 +131,7 @@ int main()
     Rect drawRect;
     drawRect.setup();
     
+    glm::mat4 projection = glm::perspective(camera.GetZoom(), (GLfloat)SCREEN_WIDTH / (GLfloat)SCREEN_HEIGHT, 0.1f, 100.0f);
     
     // Define the viewport dimensions
     glViewport( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT );
@@ -130,15 +145,23 @@ int main()
     GLint textureLoc = glGetUniformLocation( GeometryPass.Program, "tex" );
     GLint normaltextureLoc = glGetUniformLocation( GeometryPass.Program, "normaltex" );
     
+    Shader ssaoPass( "res/shaders/ssao.vs", "res/shaders/ssao.frag" );
+    GLint sPositionLoc = glGetUniformLocation(ssaoPass.Program, "gPosition");
+    GLint sNormalLoc = glGetUniformLocation(ssaoPass.Program, "gNormal");
+    GLint sprojLoc  = glGetUniformLocation(ssaoPass.Program, "projection");
+    GLint stexNoiseLoc = glGetUniformLocation(ssaoPass.Program, "texNoise");
+    GLint ssampleLoc[64];
+    for(int i = 0; i < 64; i++)
+    {
+        //ssampleLoc[i] = glGetUniformLocation(ssaoPass.Program, ("samples["+to_string(i)+"]").c_str());
+    }
     
     Shader LightingPass( "res/shaders/lighting.vs", "res/shaders/lighting.frag" );
     GLint gPositionLoc = glGetUniformLocation(LightingPass.Program, "gPosition");
     GLint gNormalLoc = glGetUniformLocation(LightingPass.Program, "gNormal");
     GLint gAlbedoloc = glGetUniformLocation(LightingPass.Program, "gAlbedo");
+    GLint ssaoloc = glGetUniformLocation(LightingPass.Program, "ssao");
     GLint viewPosLoc = glGetUniformLocation(LightingPass.Program, "viewPos");
-    
-    
-    
     GLint lightAmbloc[lightnum], lightDiffloc[lightnum], lightSpecloc[lightnum], lightPosLoc[lightnum];
     for(int i = 0; i < lightnum; i++)
     {
@@ -155,20 +178,21 @@ int main()
     // ===================
     // Texture
     // ===================
-    glGenTextures( 1, &tex );
-    glBindTexture( GL_TEXTURE_2D, tex );
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D, tex);
     // Set our texture parameters
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     // Set texture filtering
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     // Load, create texture and generate mipmaps
-    unsigned char *image = SOIL_load_image( "res/images/concrete.jpg", &width, &height, 0, SOIL_LOAD_RGBA );
-    glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image );
+    unsigned char *image = SOIL_load_image("res/images/concrete.jpg", &width, &height, 0, SOIL_LOAD_RGBA);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
     glGenerateMipmap( GL_TEXTURE_2D );
     SOIL_free_image_data( image );
     glBindTexture( GL_TEXTURE_2D, 0 );
+
     
     // Load and create a texture
     GLuint normaltex;
@@ -195,10 +219,11 @@ int main()
     GLuint gBUffer;
     glGenFramebuffers(1, &gBUffer);
     glBindFramebuffer(GL_FRAMEBUFFER, gBUffer);
+    
     GLuint gPosition, gNormal, gAlbedo;
     glGenTextures(1, &gPosition);
     glBindTexture(GL_TEXTURE_2D, gPosition);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -207,21 +232,22 @@ int main()
     
     glGenTextures(1, &gNormal);
     glBindTexture(GL_TEXTURE_2D, gNormal);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gNormal, 0);
     
     glGenTextures(1, &gAlbedo);
     glBindTexture(GL_TEXTURE_2D, gAlbedo);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gAlbedo, 0);
     
-    
     GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
     glDrawBuffers(3, attachments);
+    
+    
     
     GLuint rboDepth;
     glGenRenderbuffers(1, &rboDepth);
@@ -234,8 +260,63 @@ int main()
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     
     
-    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    // Also create framebuffer to hold SSAO processing stage
+    GLuint ssaoFbo;
+    glGenFramebuffers(1, &ssaoFbo);;
+    glBindFramebuffer(GL_FRAMEBUFFER, ssaoFbo);
+    GLuint ssaoColorBuffer;
+    // - SSAO color buffer
+    glGenTextures(1, &ssaoColorBuffer);
+    glBindTexture(GL_TEXTURE_2D, ssaoColorBuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssaoColorBuffer, 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "SSAO Framebuffer not complete!" << std::endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     
+    
+    // Sample kernel
+    std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0); // generates random floats between 0.0 and 1.0
+    std::default_random_engine generator;
+    std::vector<glm::vec3> ssaoKernel;
+    for (GLuint i = 0; i < 64; ++i)
+    {
+        glm::vec3 sample(randomFloats(generator) * 2.0 - 1.0, randomFloats(generator) * 2.0 - 1.0, randomFloats(generator));
+        sample = glm::normalize(sample);
+        sample *= randomFloats(generator);
+        GLfloat scale = GLfloat(i) / 64.0;
+        
+        // Scale samples s.t. they're more aligned to center of kernel
+        scale = lerp(0.1f, 1.0f, scale * scale);
+        sample *= scale;
+        ssaoKernel.push_back(sample);
+    }
+    
+//    for (GLuint i = 0; i < 256; ++i)
+//    {
+//        cout << "karnel["<<i<<"]="<<"new PVector(" << ssaoKernel[i].x * 50 << ", " << ssaoKernel[i].y  * 50 << ", " << ssaoKernel[i].z  * 50 << ");" << endl;
+//    }
+    // Noise texture
+    std::vector<glm::vec3> ssaoNoise;
+    for (GLuint i = 0; i < 16; i++)
+    {
+        glm::vec3 noise(randomFloats(generator) * 2.0 - 1.0, randomFloats(generator) * 2.0 - 1.0, 0.0f); // rotate around z-axis (in tangent space)
+        ssaoNoise.push_back(noise);
+    }
+    GLuint noiseTexture; glGenTextures(1, &noiseTexture);
+    glBindTexture(GL_TEXTURE_2D, noiseTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 4, 4, 0, GL_RGB, GL_FLOAT, &ssaoNoise[0]);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    
+    
+    
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
     //Loop
     while ( !glfwWindowShouldClose( window ) )
     {
@@ -247,21 +328,14 @@ int main()
         
         glfwPollEvents();
         DoMovement();
-        glEnable(GL_DEPTH_TEST);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
-        glm::mat4 projection = glm::perspective(camera.GetZoom(), (GLfloat)SCREEN_WIDTH / (GLfloat)SCREEN_HEIGHT, 0.1f, 100.0f );
         glm::mat4 view = camera.GetViewMatrix();
         
         glBindFramebuffer(GL_FRAMEBUFFER, gBUffer);
-        
-        
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-        
-        
         GeometryPass.Use();
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view) );
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
         
         glActiveTexture(GL_TEXTURE0);
@@ -288,12 +362,32 @@ int main()
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         
         
+        glBindFramebuffer(GL_FRAMEBUFFER, ssaoFbo);
+        glClear(GL_COLOR_BUFFER_BIT);
+        ssaoPass.Use();
+        for(int i = 0; i < 64; i++)
+            glUniform3fv(glGetUniformLocation(ssaoPass.Program, ("samples["+to_string(i)+"]").c_str()), 1, &ssaoKernel[i][0]);
+        glUniformMatrix4fv(sprojLoc, 1, GL_FALSE, glm::value_ptr(projection));
+        
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, gPosition);
+        glUniform1i(sPositionLoc, 0);
+
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, gNormal);
+        glUniform1i(sNormalLoc, 1);
+
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, noiseTexture);
+        glUniform1i(stexNoiseLoc, 2);
+        
+        drawRect.draw();
+        
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
         
         
-        glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glDisable(GL_DEPTH_TEST);
         LightingPass.Use();
         glUniform3f(viewPosLoc, camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
         
@@ -323,13 +417,21 @@ int main()
         glBindTexture(GL_TEXTURE_2D, gAlbedo);
         glUniform1i(gAlbedoloc, 2);
         
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, ssaoColorBuffer);
+        glUniform1i(ssaoloc, 3);
+        
         drawRect.draw();
         
+        
+        
+        
+//
         // 2.5. Copy content of geometry's depth buffer to default framebuffer's depth buffer
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, gBUffer);
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // Write to default framebuffer
-        glBlitFramebuffer(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+//        glBindFramebuffer(GL_READ_FRAMEBUFFER, gBUffer);
+//        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // Write to default framebuffer
+//        glBlitFramebuffer(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+//        glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         
         
@@ -341,6 +443,8 @@ int main()
     glDeleteTextures(1, &gPosition);
     glDeleteTextures(1, &gNormal);
     glDeleteTextures(1, &gAlbedo);
+    glDeleteFramebuffers(1, &gBUffer);
+    glDeleteFramebuffers(1, &ssaoFbo);
     
     // Terminate GLFW, clearing any resources allocated by GLFW.
     glfwTerminate( );

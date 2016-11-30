@@ -13,7 +13,7 @@ uniform sampler2D normaltex;
 
 
 const float NEAR = 0.1; // Projection matrix's near plane distance
-const float FAR = 50.0f; // Projection matrix's far plane distance
+const float FAR = 100.0f; // Projection matrix's far plane distance
 
 
 //http://www.thetenthplanet.de/archives/1180
@@ -55,6 +55,6 @@ void main()
     gPosition.xyz = FragPos;
     gPosition.w = LinearizeDepth(gl_FragCoord.z);
     
-    gNormal = NormalTexel;
+    gNormal = Normal;
     gAlbedo = texture(tex, TexCoords);
 }
