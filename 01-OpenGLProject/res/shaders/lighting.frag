@@ -30,9 +30,9 @@ void main()
     vec4 positionTexcel = texture(gPosition, TexCoord);
     vec4 normalTexcel = texture(gNormal, TexCoord);
     vec3 albedoTexcel = texture(gAlbedo, TexCoord).rgb;
-    float AmbientOcclusion = texture(ssao, TexCoord).r;
+    vec4 AmbientOcclusion = texture(ssao, TexCoord);
     
-    vec3 lighting = albedoTexcel.rgb * AmbientOcclusion; // hard-coded ambient component
+    vec3 lighting = albedoTexcel.rgb * AmbientOcclusion.r; // hard-coded ambient component
     vec3 viewDir = normalize(viewPos - positionTexcel.xyz);
     
     vec4 totalAmbient = vec4(0.0, 0.0, 0.0, 0.0);

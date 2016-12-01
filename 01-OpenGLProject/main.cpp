@@ -150,17 +150,15 @@ int main()
     GLint sNormalLoc = glGetUniformLocation(ssaoPass.Program, "gNormal");
     GLint sprojLoc  = glGetUniformLocation(ssaoPass.Program, "projection");
     GLint stexNoiseLoc = glGetUniformLocation(ssaoPass.Program, "texNoise");
-//    GLint ssampleLoc[64];
-//    for(int i = 0; i < 64; i++)
-//    {
-//        //ssampleLoc[i] = glGetUniformLocation(ssaoPass.Program, ("samples["+to_string(i)+"]").c_str());
-//    }
     
+    Shader ssaoBlurPass( "res/shaders/ssaoBlur.vs", "res/shaders/ssaoBlur.frag" );
+    GLint ssaoBlurloc = glGetUniformLocation(ssaoBlurPass.Program, "ssao");
+
     Shader LightingPass( "res/shaders/lighting.vs", "res/shaders/lighting.frag" );
     GLint gPositionLoc = glGetUniformLocation(LightingPass.Program, "gPosition");
     GLint gNormalLoc = glGetUniformLocation(LightingPass.Program, "gNormal");
     GLint gAlbedoloc = glGetUniformLocation(LightingPass.Program, "gAlbedo");
-    GLint ssaoloc = glGetUniformLocation(LightingPass.Program, "ssao");
+    //GLint ssaoloc = glGetUniformLocation(LightingPass.Program, "ssao");
     GLint viewPosLoc = glGetUniformLocation(LightingPass.Program, "viewPos");
     GLint lightAmbloc[lightnum], lightDiffloc[lightnum], lightSpecloc[lightnum], lightPosLoc[lightnum];
     for(int i = 0; i < lightnum; i++)
@@ -216,6 +214,7 @@ int main()
     glBindTexture( GL_TEXTURE_2D, 0 );
     
 
+    
     GLuint gBUffer;
     glGenFramebuffers(1, &gBUffer);
     glBindFramebuffer(GL_FRAMEBUFFER, gBUffer);
@@ -247,8 +246,6 @@ int main()
     GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
     glDrawBuffers(3, attachments);
     
-    
-    
     GLuint rboDepth;
     glGenRenderbuffers(1, &rboDepth);
     glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
@@ -259,12 +256,15 @@ int main()
         std::cout << "Framebuffer not complete!" << std::endl;
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     
+
+    
     
     // Also create framebuffer to hold SSAO processing stage
-    GLuint ssaoFbo;
-    glGenFramebuffers(1, &ssaoFbo);;
+    GLuint ssaoFbo, ssaoBlurFBO;
+    glGenFramebuffers(1, &ssaoFbo); glGenFramebuffers(1, &ssaoBlurFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, ssaoFbo);
-    GLuint ssaoColorBuffer;
+    GLuint  ssaoColorBuffer, ssaoColorBufferBlur;
+    
     // - SSAO color buffer
     glGenTextures(1, &ssaoColorBuffer);
     glBindTexture(GL_TEXTURE_2D, ssaoColorBuffer);
@@ -276,6 +276,19 @@ int main()
         std::cout << "SSAO Framebuffer not complete!" << std::endl;
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     
+
+    glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
+    glGenTextures(1, &ssaoColorBufferBlur);
+    glBindTexture(GL_TEXTURE_2D, ssaoColorBufferBlur);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssaoColorBufferBlur, 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "SSAO Blur Framebuffer not complete!" << std::endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    
+
     
     // Sample kernel
     std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0); // generates random floats between 0.0 and 1.0
@@ -327,7 +340,7 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glm::mat4 view = camera.GetViewMatrix();
         
-        
+
         //1.Geometry Pass
         glBindFramebuffer(GL_FRAMEBUFFER, gBUffer);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -359,6 +372,7 @@ int main()
         }
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         
+        
         //2.SSAO Pass
         glBindFramebuffer(GL_FRAMEBUFFER, ssaoFbo);
             glClear(GL_COLOR_BUFFER_BIT);
@@ -382,11 +396,26 @@ int main()
             glUniform1i(stexNoiseLoc, 2);
             
             drawRect.draw();
+        
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         
         
         
-        // 3.Lighting Pass
+        // 3.5. Processing Blur
+        glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
+            glClear(GL_COLOR_BUFFER_BIT);
+            ssaoBlurPass.Use();
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, ssaoColorBuffer);
+            glUniform1i(ssaoBlurloc, 0);
+            
+            drawRect.draw();
+        
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        
+        
+        
+        // 4.Lighting Pass
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         LightingPass.Use();
         glActiveTexture(GL_TEXTURE0);
@@ -402,8 +431,8 @@ int main()
         glUniform1i(gAlbedoloc, 2);
         
         glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, ssaoColorBuffer);
-        glUniform1i(ssaoloc, 3);
+        glBindTexture(GL_TEXTURE_2D, ssaoColorBufferBlur);
+        glUniform1i(glGetUniformLocation(LightingPass.Program, "ssao"), 3);
         
         
         glUniform3f(viewPosLoc, camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
