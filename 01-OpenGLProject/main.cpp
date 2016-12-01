@@ -50,8 +50,8 @@ GLfloat deltaTime = 0.0f;
 GLfloat lastFrame = 0.0f;
 
 
-const int boxnum = 10;
-const int lightnum = 5;
+const int boxnum = 400;
+const int lightnum = 4;
 
 GLfloat lerp(GLfloat a, GLfloat b, GLfloat f)
 {
@@ -88,9 +88,9 @@ int main()
     {
         random_device rnd;
         mt19937 mt(rnd());
-        std::uniform_int_distribution<> x(-5.0, 5.0);
-        std::uniform_int_distribution<> y(-5.0, 5.0);
-        std::uniform_int_distribution<> z(-5.0, 5.0);
+        std::uniform_int_distribution<> x(-24.0, 24.0);
+        std::uniform_int_distribution<> y(-24.0, 24.0);
+        std::uniform_int_distribution<> z(-24.0, 24.0);
         for(int i = 0; i < boxnum; i++){ cubePositions[i] = glm::vec3(x(mt), y(mt), z(mt)); }
     }
     
@@ -328,7 +328,7 @@ int main()
         glm::mat4 view = camera.GetViewMatrix();
         
         
-        //Geometry Pass
+        //1.Geometry Pass
         glBindFramebuffer(GL_FRAMEBUFFER, gBUffer);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
@@ -359,7 +359,7 @@ int main()
         }
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         
-        //SSAO Pass
+        //2.SSAO Pass
         glBindFramebuffer(GL_FRAMEBUFFER, ssaoFbo);
             glClear(GL_COLOR_BUFFER_BIT);
             ssaoPass.Use();
@@ -385,7 +385,8 @@ int main()
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         
         
-
+        
+        // 3.Lighting Pass
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         LightingPass.Use();
         glActiveTexture(GL_TEXTURE0);
@@ -406,11 +407,15 @@ int main()
         
         
         glUniform3f(viewPosLoc, camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z);
+        
         glm::vec3 lightAmbient = glm::vec3(0.0, 0.0, 0.0);
         glm::vec3 lightSpecular = glm::vec3(1.0, 1.0, 1.0);
+        glm::vec3 lightPosView[lightnum];
         for(int i = 0; i < lightnum; i++)
         {
-            glUniform3fv(lightPosLoc[i], 1, &lightPositions[i][0]);
+            lightPosView[i] = glm::vec3(camera.GetViewMatrix() * glm::vec4(lightPositions[i], 1.0));
+            
+            glUniform3fv(lightPosLoc[i], 1, &lightPosView[i][0]);
             glUniform3fv(lightAmbloc[i], 1, glm::value_ptr(lightAmbient));
             glUniform3fv(lightDiffloc[i], 1, &lightDiffuse[i][0]);
             glUniform3fv(lightSpecloc[i], 1, glm::value_ptr(lightSpecular));
@@ -422,15 +427,12 @@ int main()
         
         drawRect.draw();
         
-        
-        
-        
 //
         // 2.5. Copy content of geometry's depth buffer to default framebuffer's depth buffer
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, gBUffer);
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // Write to default framebuffer
-        glBlitFramebuffer(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+//        glBindFramebuffer(GL_READ_FRAMEBUFFER, gBUffer);
+//        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // Write to default framebuffer
+//        glBlitFramebuffer(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+//        glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         
         

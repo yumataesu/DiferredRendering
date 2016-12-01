@@ -55,6 +55,6 @@ void main()
     gPosition.xyz = FragPos;
     gPosition.w = LinearizeDepth(gl_FragCoord.z);
     
-    gNormal = Normal;
+    gNormal = Normal.xyz;
     gAlbedo = texture(tex, TexCoords);
 }
