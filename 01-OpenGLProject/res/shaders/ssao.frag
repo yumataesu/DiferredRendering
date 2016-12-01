@@ -24,18 +24,15 @@ void main()
     vec3 bitangent = cross(normalTexel, tangent);
     
     mat3 TBN = mat3(tangent, bitangent, normalTexel);
-    float depth = positionTexel.w;
     
     float occlusion = 0.0;
-    vec3 sample = vec3(0.0, 0.0, 0.0);
-    vec4 offset = vec4(0.0, 0.0, 0.0, 0.0);
     for(int i = 0; i < kernelSize; ++i)
     {
-        sample = TBN * samples[i]; // From tangent to view-space
+        vec3 sample = TBN * samples[i]; // From tangent to view-space
         sample = positionTexel.xyz + sample * radius;
         
         // project sample position (to sample texture) (to get position on screen/texture)
-        offset = vec4(sample, 1.0);
+        vec4 offset = vec4(sample, 1.0);
         offset = projection * offset; // from view to clip-space
         offset.xyz /= offset.w; // perspective divide
         offset.xyz = offset.xyz * 0.5 + 0.5; // transform to range 0.0 - 1.0
